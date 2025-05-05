@@ -188,7 +188,6 @@ forward-zone:
 
 The port is changed from the default port 53 to 5335 as the PiHole documentation says to do because of the port conflict that would be the cause if you don't do that. Because PiHole runs already under port 53.
 
-
 ```bash
 #!/bin/bash
 sudo systemctl enable --now unbound # if not done already
@@ -201,3 +200,32 @@ dig dnssec.works @127.0.0.1 -p 5335 # expected status: NOERROR
 ```
 
 And now we are finished with the configuration of the Unbound DNS request forwarder. So you can change the DNS reference within PiHole to `127.0.0.1#5335` within the section `Settings -> DNS`.
+
+### Last Steps
+
+Now the Unbound setup and the reference to it within PiHole is made you should change the config of `networking` so that your Rasberry calls only to the locally DNS setup (PiHole) and not to your standard router.
+
+```bash
+source /etc/network/interfaces.d/*
+
+auto lo
+iface lo inet loopback
+
+# your normal network; gateway of your other networks/interfaces
+auto eth0
+iface eth0 inet static
+    ...
+    dns-nameservers 127.0.0.1 # own DNS configuration
+
+# gateway of manually configured clients; virtual ethernet interface
+auto eth0:1
+iface eth0:1 inet static
+    ...
+    dns-nameservers 127.0.0.1 ::1
+
+# accesspoint interface
+auto wlan0
+iface wlan0 inet static
+    ...
+    dns-nameservers 127.0.0.1 ::1
+```
