@@ -41,6 +41,7 @@ But I use for configure a static IP-Adresses the service called `networking`. Fo
 ```bash
 #!/bin/bash
 sudo apt-get install ifupdown
+sudo rfkill unblock wifi # remove soft lock of wlan interface
 ```
 
 For the configuration of this service you can add a onfiguration file to `/etc/network/interfaces.d/YOUR-CONF` but I'd like to use the basic config file `/etc/network/interfaces`. Here a template for that. And for more information I like to refer to [ubuntuusers](https://wiki.ubuntuusers.de/interfaces/).
@@ -229,3 +230,92 @@ iface wlan0 inet static
     ...
     dns-nameservers 127.0.0.1 ::1
 ```
+
+After that you should restart your server to load up every setting and newly made configuration correcly.
+
+## Forwarding Subnet Packages
+
+First you have to **enable** that IPv4 packages have the right to be forwarded across another interface. Add/Uncomment for that a line within `/etc/sysctl.conf`.
+
+```bash
+#!/bin/bash
+sudo nano "/etc/sysctl.conf"
+```
+
+The line I told about. You can add or uncomment the containing one.
+
+```bash
+net.ipv4.ip_forward=1
+```
+
+Now add the following forwarding configurations with **iptables**.
+
+```bash
+#!/bin/bash
+sudo iptables -t nat -A POSTROUTING -o eth0 -s 10.140.20.0/24 -j MASQUERADE
+sudo iptables -t nat -A POSTROUTING -o eth0 -s 10.140.25.0/24 -j MASQUERADE
+```
+
+This configuration is only temporary so you can put your configuration into the `/etc/iptables.ipv4.nat` files. Or you install a package that makes exactly that for you. Make the temporary config persistent.
+
+For that you can install following packages.
+
+```bash
+#!/bin/bash
+sudo apt-get install iptables-persistent netfilter-persistent
+sudo systemctl enable --now netfilter-persistent.service # only to be sure that it runs correctly
+sudo netfilter-persistent save # makes it persistent
+```
+
+## Hostapd - AccessPoint
+
+To make a AccessPoint via **wlan0** interface you can use the DHCP configuration within the PiHole web ui. PiHole will be reployed and installed with **dnsmasq** so you don't have to setup the DHCP for your wlan0 interface manually.
+
+You have to install Hostapd for that.
+```bash
+#!/bin/bash
+sudo apt-get install hostapd
+# creating future hostapd config
+sudo touch /etc/hostapd/hostapd.conf
+sudo nano /etc/default/hostapd # needs to refer to config path
+```
+
+Now that you have the file `/etc/default/hostapd` open you should change/add this line to the configurations.
+
+```bash
+DAEMON_CONF="/etc/hostapd/hostapd.conf"
+```
+
+Let us configure the AccessPoint (hostapd). For that open the file `/etc/hostapd/hostapd.conf` with the editor your choice. Here an example for a 5GHz AccessPoint.
+
+```bash
+interface=wlan0
+driver=nl80211
+
+ssid=NAME_NETWORK
+country_code=DE
+
+hw_mode=a
+channel=36
+ieee80211d=1
+ieee80211n=1
+ieee80211ac=1
+wmm_enabled=1
+
+wpa=2
+wpa_key_mgmt=WPA-PSK
+rsn_pairwise=CCMP
+auth_algs=1
+wpa_passphrase=PASSWORD
+```
+
+And now we have to **enable** and **start** the service. Then check if the service is running correctly.
+
+```bash
+#!/bin/bash
+sudo systemctl enable --now hostapd
+sudo systemctl status hostapd
+```
+
+But if the current service is already running you should just restart it and checkout the status of this service with **systemctl**.
+
