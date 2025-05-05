@@ -99,3 +99,105 @@ So to check if everything runs fine you can check that with followed commands.
 #!/bin/bash
 ifconfig # or 'ip -br a'
 ```
+
+## PiHole
+
+I would also recommend to use **PiHole** or alternatives like **AdGuard  Home**. A huge part of this guide is possibly also usable for **AdGuard Home** but I refer to **PiHole**.
+
+To install PiHole you can use this command or go to this [https://pi-hole.net/](https://github.com/pi-hole/pi-hole/#one-step-automated-install) to get more informations.
+
+```bash
+#!/bin/bash
+curl -sSL https://install.pi-hole.net | bash
+```
+
+After you followed throught the guide you should have a running website to handle PiHole.
+
+### Blocklists
+
+I recommend a very famous blocklist source [here](https://github.com/hagezi/dns-blocklists). I tested these here.
+
+* [**Multi pro**](https://github.com/hagezi/dns-blocklists?tab=readme-ov-file#pro)
+* [**Pop-Up Ads**](https://github.com/hagezi/dns-blocklists?tab=readme-ov-file#popupads)
+* [**Threat Intelligence Feeds**](https://github.com/hagezi/dns-blocklists?tab=readme-ov-file#tif)
+
+Afterwards you added your blocklists of your choice you have to get to `Tools -> Update Gravity` section within the web ui and click on `update`. You can do that over the terimal as alternative if you prefer that.
+
+### Unbound
+
+PiHole has a guide for Unbound as a recursive DNS. It's well documented and works correctly if you want to setup that. Also lookup here for checkups for your configurations.
+
+I like to have followed features if I make a request to a DNS.
+* **DNSSEC** - validate response of DNS server
+* **DNS-Over-TLS (DOT)** - encrypted requests to the DNS server
+
+The problem is PiHole supported only **DNSSEC** so I build my own DNS request forwarder with the help of **Unbound**. Unbound is basicly a service that makes the same thing as every DNS server does. It makes requests to the **root nameserver**. The problem with that is that DNS servers and Unbound not encrypt the requests that they make.
+
+But you can also use Unbound to use Unbound normally to make DNS requests but also encrypted (DOT).
+
+```bash
+#!/bin/bash
+sudo apt-get install unbound
+```
+
+Now that Unbound installed you need to configure it.
+
+```bash
+#!/bin/bash
+sudo nano /etc/unbound/unbound.conf.d/NAMECONFIG.conf
+```
+
+Here an example how I make this configuration for Unbound.
+```bash
+server:
+    # logfile: "/var/log/unbound/unbound.log"
+    verbosity: 0
+
+    interface: 127.0.0.1
+    port: 5335
+    do-ip4: yes
+    do-udp: yes
+    do-tcp: yes
+    do-ip6: yes
+
+    prefer-ip6: no
+    harden-glue: yes
+    harden-dnssec-stripped: yes
+    use-caps-for-id: no
+    edns-buffer-size: 1232
+    prefetch: yes
+    num-threads: 1
+    so-rcvbuf: 1m
+
+    tls-cert-bundle: "/etc/ssl/certs/ca-certificates.crt"
+
+    private-address: 192.168.0.0/24
+    private-address: 10.140.20.0/24
+    private-address: 10.140.25.0/24
+
+forward-zone:
+    name: .
+    forward-first: no # disables fallback to recursive dns behavior
+    forward-tls-upstream: yes
+    # uses Quad9; can be replaced with other configs
+    forward-addr: 9.9.9.9@853#dns.quad9.net
+    forward-addr: 149.112.112.112@853#dns.quad9.net
+    forward-addr: 2620:fe::fe@853#dns.quad9.net
+    forward-addr: 2620:fe::9@853#dns.quad9.net
+```
+
+The port is changed from the default port 53 to 5335 as the PiHole documentation says to do because of the port conflict that would be the cause if you don't do that. Because PiHole runs already under port 53.
+
+
+```bash
+#!/bin/bash
+sudo systemctl enable --now unbound # if not done already
+sudo systemctl restart unbound
+
+# checks connection with DNS
+dig pi-hole.net @127.0.0.1 -p 5335 # expected status: NOERROR
+dig fail01.dnssec.works @127.0.0.1 -p 5335 # expected status: SERVFAIL
+dig dnssec.works @127.0.0.1 -p 5335 # expected status: NOERROR
+```
+
+And now we are finished with the configuration of the Unbound DNS request forwarder. So you can change the DNS reference within PiHole to `127.0.0.1#5335` within the section `Settings -> DNS`.
