@@ -313,9 +313,60 @@ And now we have to **enable** and **start** the service. Then check if the servi
 
 ```bash
 #!/bin/bash
+sudo systemctl unmask hostapd
 sudo systemctl enable --now hostapd
 sudo systemctl status hostapd
 ```
 
-But if the current service is already running you should just restart it and checkout the status of this service with **systemctl**.
+But if the current service is already running you should just restart it and checkout the status of this service using **systemctl**.
 
+Afterwards you can add your DHCP IP-Adress section that you want to be automaticly assigned to the clients. For that use the IP-Adress section that is within the subnet of **wlan0**. Then you should restart your RaspberryPi and checkout if you can connect with your clients and get access to the internet. 
+
+### Forwarding Error
+
+If not maybe checkout if the forwarding (common problem) is the problem. You can test that if you make this temporary and reconnect to your AccessPoint.
+
+```bash
+#!/bin/bash
+sudo iptables -t nat -A POSTROUTING -o eth0 -s 10.140.20.0/24 -j MASQUERADE
+```
+
+If that's the problem you could write down a daemon (`/etc/systemd/system/YOURDAEMON.service`) that makes this every time you restart your server. But that would be not the greatest solution for that kind of problem. Here an example for that.
+
+Here an example for a service like that.
+
+```bash
+[Unit]
+Description=assignes interfaces to forward
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash PATH.sh
+RemainAfterExit=true
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Naturally you have to write the `PATH.sh`. Here also an example for that.
+
+```bash
+#!/bin/bash
+sudo iptables -t nat -A POSTROUTING -o eth0 -s 10.140.20.0/24 -j MASQUERADE
+sudo iptables -t nat -A POSTROUTING -o eth0 -s 10.140.25.0/24 -j MASQUERADE
+```
+
+Now you can **enable** your own service.
+
+```bash
+#!/bin/bash
+sudo systemctl enable --now YOURDAEMON.service
+sudo systemctl status YOURDAEMON.service
+```
+
+And that's it. Now it should work out fine even without the convenience of the tools that does that.
+
+So a final restart and checkout and we are finished with the AccessPoint, static adresses and a DNS blocklist (with encryption via Unbound).
