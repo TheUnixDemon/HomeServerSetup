@@ -54,7 +54,7 @@ iface lo inet loopback
 # your normal network; gateway of your other networks/interfaces
 auto eth0
 iface eth0 inet static
-    address 192.168.0.44/24
+    address 192.168.0.40/24
     gateway 192.168.0.1
     network 192.168.0.0
     broadcast 192.168.0.255
