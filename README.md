@@ -2,8 +2,6 @@
 
 Here I explain how I setup my own server for my private usage at home. I use the RaspberryPi 4B with 8GB memory and a external hard driver as a storage. As an operating system I use raspian because it's used to be the stablest ones. To be exact here I use `Raspberry Pi OS Lite (64-bit)`.
 
-Also [here](./Resources/SERVICES.md) a list of services that I host right now. These services, it's usage and it's installation will be expained later on.
-
 The reason for that kind of *project* is to have a own seperated router where everything can be hosted and you have 100% control about anything like content filtering, hosting a own VPN, configuring a additional firewall or basicly anything that doesn't require a ton of processor power. But basicly everything here can be used on similar Debian based x86 systems if needed. But I like to refer to my setup. Also I like to keep my 
 
 # Installation Guide
@@ -370,3 +368,88 @@ sudo systemctl status YOURDAEMON.service
 And that's it. Now it should work out fine even without the convenience of the tools that does that.
 
 So a final restart and checkout and we are finished with the AccessPoint, static adresses and a DNS blocklist (with encryption via Unbound).
+
+## PIVPN - WireGuard
+
+I used PIVPN with WireGuard to make access from outside my private network possible. So I want to mention that here.
+
+Oneshot line to install [PIVPN](https://www.pivpn.io/). I recommend to enable automatic security updates and refer to PiHole as DNS. The rest of it is pretty much easy going.
+
+```bash
+#!/bin/bash
+curl -L https://install.pivpn.io | bash
+```
+
+You only have to go through everything that PIVPN mentioned. After that the VPN is ready to use. But don't forget to make a rule on your default router that the port that you've choosen is open and uses **udp**.
+
+## DDNS Client
+
+If you want to get access from outside you have probably a dynamic ip adress that you get from you ISP. So you have to get a DDNS that refers to your ip. Basicly your server (RaspberryPi) makes a call intervallwise to the DDNS host so that the domain gets updated and refers to your current ip adress.
+
+Here I show how it's done with the service `ddclient` and **no-ip.com** since **no-ip.com** is free to use. `ddclient` can use every host of DDNS adresses.
+
+```bash
+#!/bin/bash
+sudo apt-get install ddclient
+sudo nano /etc/ddclient.conf
+```
+
+Here the configuration for **no-ip.com** with `ddclient`.
+
+```bash
+# ddclient.conf für No-IP (dyndns2)
+protocol=dyndns2
+use=web, web=checkip.dyndns.com/, web-skip='IP Address'
+server=dynupdate.no-ip.com
+login=USERNAME
+password=PASSWORD
+DOMAINNAME.SUFFIX
+```
+
+```bash
+#!/bin/bash
+sudo systemctl enable --now ddclient
+sudo systemctl status ddclient
+```
+
+If `ddclient` has a error within it's status restart the service and try it again.
+
+## Jellyfin
+
+Also i like to run a Jellyfin server. And if you use the raspberry only for transfering the data it's no big deal because the encoding process will happen on the client devices.
+
+Here the oneshot line to install Jellyfin.
+
+```bash
+#!/bin/bash
+curl -s https://repo.jellyfin.org/install-debuntu.sh | sudo bash
+```
+
+For the storage I use a hard drive that is mounted through the configuration that I made within `/etc/fstab`.
+
+Output every UUID and storage information of connected devices.
+
+```bash
+#!/bin/bash
+sudo blkid
+```
+
+And now you can use that UUID of your choosen device to mount that device where you want to using `/etc/fstab`. I would recommend to have the device with the ext4 data systems because it's the same as evey linux systems uses. So it will probably not have any issues because of the format. 
+
+Add this line with your mounting directory and the UUID of your device to the file `/etc/fstab`.
+
+```bash
+...
+# jellyfin
+UUID=YOUR_UUID /MOUNTINGDIR ext4 defaults,users,exec 0 0
+```
+
+After a reboot the device should be mounted. You can check that using `df`. If everything is fine you can refer within jellyfin to the directories of the device and storage your data on this device.
+
+### HTTPS
+
+It is important to know that every client software that I know can't handle self signed SSL certificates. Other users have the same problem here. So I would say if you want to use HTTPS you have no choice but to make a certified SSL certificate. For that you can use `certbot`. 
+
+Or you make a reverse proxy. The scenario is that Jellyfin uses a self signed SSL certificate and your desktop binds that connection locally over HTTP using Apache2 or something like that. 
+
+But that would only workout for devices that can bind the HTTPS connection locally on a local HTTP side. So mobile devices would have trouble with that.
