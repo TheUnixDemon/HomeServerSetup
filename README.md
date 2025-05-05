@@ -43,4 +43,36 @@ But I use for configure a static IP-Adresses the service called `networking`. Fo
 sudo apt-get install ifupdown
 ```
 
-For the configuration of this service you can add a onfiguration file to `/etc/network/interfaces.d/YOUR-CONF` but I'd like to use the basic config file `/etc/network/interfaces`. 
+For the configuration of this service you can add a onfiguration file to `/etc/network/interfaces.d/YOUR-CONF` but I'd like to use the basic config file `/etc/network/interfaces`. Here a template for that.
+
+```bash
+source /etc/network/interfaces.d/*
+
+auto lo
+iface lo inet loopback
+
+# your normal network; gateway of your other networks/interfaces
+auto eth0
+iface eth0 inet static
+    address 192.168.0.44/24
+    gateway 192.168.0.1
+    network 192.168.0.0
+    broadcast 192.168.0.255
+#    dns-nameservers 127.0.0.1 # own DNS; for later
+
+# gateway of manually configured clients; virtual ethernet interface
+auto eth0:1
+iface eth0:1 inet static
+    address 10.140.25.1/24
+    network 10.140.25.0
+    broadcast 10.140.25.255
+#    dns-nameservers 127.0.0.1 ::1
+
+# accesspoint interface
+auto wlan0
+iface wlan0 inet static
+    address 10.140.20.1/24
+    network 10.140.20.0
+    broatcast 10.140.20.255
+#    dns-nameservers 127.0.0.1 ::1
+```
