@@ -43,7 +43,7 @@ But I use for configure a static IP-Adresses the service called `networking`. Fo
 sudo apt-get install ifupdown
 ```
 
-For the configuration of this service you can add a onfiguration file to `/etc/network/interfaces.d/YOUR-CONF` but I'd like to use the basic config file `/etc/network/interfaces`. Here a template for that.
+For the configuration of this service you can add a onfiguration file to `/etc/network/interfaces.d/YOUR-CONF` but I'd like to use the basic config file `/etc/network/interfaces`. Here a template for that. And for more information I like to refer to [ubuntuusers](https://wiki.ubuntuusers.de/interfaces/).
 
 ```bash
 source /etc/network/interfaces.d/*
@@ -75,4 +75,27 @@ iface wlan0 inet static
     network 10.140.20.0
     broatcast 10.140.20.255
 #    dns-nameservers 127.0.0.1 ::1
+```
+
+Now the config is complete you should **enable** the service and **disable** the other ones that want to configure the interfaces.
+
+```bash
+#!/bin/bash
+sudo systemctl disable NetworkManager systemd-networkd
+sudo systemctl enable --now networking
+sudo systemctl status networking
+```
+
+If you checked the `networking` service and it says something like that the interfaces are already configured that is caused by `NetworkManager` and `systemd-networkd`. So you need to restart to let `networking` configure the interfaces for you needs.
+
+```bash
+#!/bin/bash
+sudo reboot
+```
+
+So to check if everything runs fine you can check that with followed commands.
+
+```bash
+#!/bin/bash
+ifconfig # or 'ip -br a'
 ```
