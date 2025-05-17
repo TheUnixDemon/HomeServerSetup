@@ -9,7 +9,21 @@
     - [PUB-Key Auth](#ssh_auth)
     - [Configure Service](#ssh_config)
 - [Static IP Adresses](#static_ip)
-    
+- [Raspberry Pi (Raspberry Pi OS)](#rasberrypios_two)
+    - [PiHole](#pihole)
+        - [Blocklists](#blocklists)
+        - [Unbound](#unbound)
+        - [Last Steps](#last-steps)
+    - [Hostapd - AccessPoint](#hostapd---accesspoint)
+        - [Forwarding Error](#forwarding-error)
+    - [PiVPN](#pivpn---wireguard)
+        - [DDNS Client](#ddns-client)
+- [Notebook (Debian)](#notebook-debian)
+    - [Jellyfin](#jellyfin)
+        - [Stoarge](#storage)
+        - [Hardware Acceleration - Intel GPU](#hardware-acceleration---intel-gpu)
+    - [Samba](#samba)
+- [HTTPS](#https)
 
 <a name="os"></a>
 # Choice of OS
@@ -171,6 +185,7 @@ ifconfig # or 'ip -br a'
 sudo systemctl status networking
 ```
 
+<a name="raspberrypios_two"></a>
 # Raspberry Pi (Rasberry Pi OS)
 
 ## PiHole
@@ -274,6 +289,7 @@ dig dnssec.works @127.0.0.1 -p 5335 # expected status: NOERROR
 
 And now we are finished with the configuration of the Unbound DNS request forwarder. So you can change the DNS reference within PiHole to `127.0.0.1#5335` within the section `Settings -> DNS`.
 
+<a name="pihole_last"></a>
 ### Last Steps
 
 Now the Unbound setup and the reference to it within PiHole is made you should change the config of `networking` so that your Rasberry calls only to the locally DNS setup (PiHole) and not to your standard router.
