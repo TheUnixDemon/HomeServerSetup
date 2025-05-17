@@ -1,12 +1,22 @@
 # Table of Content
 
-- [Choice of OS]()
+- [Choice of OS](#os)
+- [Installation - Operationg sytems](#debian)
+    - [Debian](#debian)
+    - [Rasberry Pi OS](#raspberrypios)
+- [SSH](#ssh)
+    - [Enable Service](#ssh_enable)
+    - [PUB-Key Auth](#ssh_auth)
+    - [Configure Service](#ssh_config)
+- [Static IP Adresses](#static_ip)
+    
 
 <a name="os"></a>
 # Choice of OS
 
 The Rasberry Pi as *Rasberry Pi OS* installed because it's the offical operating system for this board and has a wide range of community support. On the notebook is installed *Debian* but headless. If installed as I do (headless basicly) some other tools are also not preinstalled like `sudo`.
 
+<a name="debian"></a>
 # Installation - Debian
 
 Install using the installation image [*Netinst*](https://www.debian.org/CD/netinst/) and an external drive to boot from. After booting from the external drive *uncheck* every graphical environment that is choosen so that non of them will be installed.
@@ -32,6 +42,7 @@ su USERNAME # change user
 id
 ```
 
+<a name="raspberrypios"></a>
 # Installation - Rasberry Pi OS
 Install via [`Raspberry Pi Imager`](https://www.raspberrypi.com/software/) or other flashing software to install `Raspberry Pi OS Lite (64-bit)` on the storage of your choice. Also keep in mind to enable SSH and maybe setup the PUB-Key for the authentication process already. After the installation update the system.
 
@@ -40,10 +51,12 @@ sudo apt update && sudo apt full-upgrade
 sudo reboot
 ```
 
+<a name="ssh"></a>
 # SSH
 
-Here is explained how I setup `SSH` for both operating systems. So some steps here are unnecessary for one of them of course.
+Here is explained how I setup `SSH` for both operating systems. So some steps here are unnecessary for one of them of course. The installation of the package `ssh` is either explained in the [steps before](#debian) or preinstalled like by `Raspberry Pi OS`.
 
+<a name="ssh_enable"></a>
 ## Enable Service
 
 Enable and start the service and check the status of the service. If everything runs smoothly the SSH access is now ready to use.
@@ -53,7 +66,7 @@ Enable and start the service and check the status of the service. If everything 
 sudo systemctl enable --now ssh.service
 sudo systemctl status ssh.service
 ```
-
+<a name="ssh_auth"></a>
 ## PUB-Key Auth
 
 If you want to generate the files for the PUB-Key authentication. Here a command for that. I would recommend to checkout [ubuntuusers](https://wiki.ubuntuusers.de/SSH/) for a better understanding how SSH and `ssh-keygen` works.
@@ -65,6 +78,7 @@ ssh-keygen -t rsa -b 4096
 
 The keys will be saved in the folger `~/.ssh`. You need to put the content of the `*.pub` in the `authorized_keys`. Also you can put that public key manually there. For that copie in the `/home/PIUSER/.ssh/authorized_keys`. Maybe you need to create the `.ssh` folder beforewards.
 
+<a name="ssh_config"></a>
 ## Configure Service
 
 After the PUB-Key authentification is working (tested) change some lines in the configuration file (`/etc/ssh/sshd_config`) for `SSH` to disable the password based login and the login into `root` via `SSH`.
@@ -86,7 +100,7 @@ Now edit the lines `#PermitRootLogin ...` to `PermitRootLogin No` so no logins v
 sudo systemctl restart ssh.service
 sudo systemctl status ssh.service
 ```
-
+<a name="static_ip"></a>
 # Static IP-Adress
 
 For that I don't use `dhcpcd` or `NetworkManager`. You could use `dhcpcd` if you don't want to use your Raspberry Router for LAN connections but only as AccessPoint. For that you need to install `dhcpcd5`. Basicly I had trouble to setup virtual interfaces with `dhcpcd5` but maybe there is some work around for that.
