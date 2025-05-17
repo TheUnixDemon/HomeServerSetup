@@ -1,16 +1,62 @@
-# Setup - MyHomePi
+# Table of Content
 
-Here I explain how I setup my own server for my private usage at home. I use the RaspberryPi 4B with 8GB memory and a external hard driver as a storage. As an operating system I use raspian because it's used to be the stablest ones. To be exact here I use `Raspberry Pi OS Lite (64-bit)`.
+- [Choice of OS]()
 
-The reason for that kind of *project* is to have a own seperated router where everything can be hosted and you have 100% control about anything like content filtering, hosting a own VPN, configuring a additional firewall or basicly anything that doesn't require a ton of processor power. But basicly everything here can be used on similar Debian based x86 systems if needed. But I like to refer to my setup. Also I like to keep my 
+<a name="os"></a>
+# Choice of OS
 
-# Installation Guide
+The Rasberry Pi as *Rasberry Pi OS* installed because it's the offical operating system for this board and has a wide range of community support. On the notebook is installed *Debian* but headless. If installed as I do (headless basicly) some other tools are also not preinstalled like `sudo`.
 
-## Flashing Storage & SSH PUB-Key
+# Installation - Debian
 
-Install via [`Raspberry Pi Imager`](https://www.raspberrypi.com/software/) or other flashing software to install `Raspberry Pi OS Lite (64-bit)` on the storage of your choice. Also keep in mind to enable SSH and maybe install already the PUB-Key for the authentication process.
+Install using the installation image [*Netinst*](https://www.debian.org/CD/netinst/) and an external drive to boot from. After booting from the external drive *uncheck* every graphical environment that is choosen so that non of them will be installed.
 
-If you want to generate the keys for the PUB-Key authentication. Here a command for that. I would recommend to checkout [ubuntuusers](https://wiki.ubuntuusers.de/SSH/) for a better understanding how SSH and `ssh-keygen` works.
+Now install `SSH` and `SUDO` software. After installing `SUDO` the choosen user has to be added to the `SUDO` group to have access to `SUDO`.
+
+```bash
+#!/bin/bash
+# update system
+apt update && sudo apt full-upgrade
+
+# install software
+apt install ssh sudo
+usermod -aG sudo USERNAME # add USERNAME to group
+reboot
+```
+
+Now you can change to the user that is assigned to the `SUDO` group to check up if the wished group is assigned to the user.
+
+```bash
+#!/bin/bash
+su USERNAME # change user
+id
+```
+
+# Installation - Rasberry Pi OS
+Install via [`Raspberry Pi Imager`](https://www.raspberrypi.com/software/) or other flashing software to install `Raspberry Pi OS Lite (64-bit)` on the storage of your choice. Also keep in mind to enable SSH and maybe setup the PUB-Key for the authentication process already. After the installation update the system.
+
+```bash
+sudo apt update && sudo apt full-upgrade
+sudo reboot
+```
+
+# SSH
+
+Here is explained how I setup `SSH` for both operating systems. So some steps here are unnecessary for one of them of course.
+
+## Enable Service
+
+Enable and start the service and check the status of the service. If everything runs smoothly the SSH access is now ready to use.
+
+```bash
+#!/bin/bash
+sudo systemctl enable --now ssh.service
+sudo systemctl status ssh.service
+```
+
+## PUB-Key Auth
+
+If you want to generate the files for the PUB-Key authentication. Here a command for that. I would recommend to checkout [ubuntuusers](https://wiki.ubuntuusers.de/SSH/) for a better understanding how SSH and `ssh-keygen` works.
 
 ```bash
 #!/bin/bash
@@ -19,20 +65,31 @@ ssh-keygen -t rsa -b 4096
 
 The keys will be saved in the folger `~/.ssh`. You need to put the content of the `*.pub` in the `authorized_keys`. Also you can put that public key manually there. For that copie in the `/home/PIUSER/.ssh/authorized_keys`. Maybe you need to create the `.ssh` folder beforewards.
 
-## After Installation
+## Configure Service
 
-After installation of Raspian with SSH access the first step would be to update the system and reboot afterwards.
+After the PUB-Key authentification is working (tested) change some lines in the configuration file (`/etc/ssh/sshd_config`) for `SSH` to disable the password based login and the login into `root` via `SSH`.
+
+But before make sure to have a copie of the working configuration file to rollback if problems with the service are happening.
 
 ```bash
 #!/bin/bash
-# full-upgrade is newer than dist-upgrade but does the same
-sudo apt update && sudo apt full-upgrade
-sudo reboot
+sudo su
+cd /etc/ssh
+cp -a sshd_config sshd_config.backup
+nano sshd_config
 ```
 
-## Static IP-Adress
+Now edit the lines `#PermitRootLogin ...` to `PermitRootLogin No` so no logins via password is valid anymore. After that restart the service to get the changed configuration working.
 
-For that we don't use `dhcpcd` or `NetworkManager`. You could use `dhcpcd` if you don't want to use your RaspberryRouter for LAN connections but only as AccessPoint. For that you need to install `dhcpcd5`. Basicly I had trouble to setup virtual interfaces with `dhcpcd5` but maybe there is some work around for that.
+```bash
+#!/bin/bash
+sudo systemctl restart ssh.service
+sudo systemctl status ssh.service
+```
+
+# Static IP-Adress
+
+For that I don't use `dhcpcd` or `NetworkManager`. You could use `dhcpcd` if you don't want to use your Raspberry Router for LAN connections but only as AccessPoint. For that you need to install `dhcpcd5`. Basicly I had trouble to setup virtual interfaces with `dhcpcd5` but maybe there is some work around for that.
 
 But I use for configure a static IP-Adresses the service called `networking`. For that install `ifupdown` than you are good to go with the installation part.
 
@@ -42,7 +99,7 @@ sudo apt-get install ifupdown
 sudo rfkill unblock wifi # remove soft lock of wlan interface
 ```
 
-For the configuration of this service you can add a onfiguration file to `/etc/network/interfaces.d/YOUR-CONF` but I'd like to use the basic config file `/etc/network/interfaces`. Here a template for that. And for more information I like to refer to [ubuntuusers](https://wiki.ubuntuusers.de/interfaces/).
+For the configuration of this service you can add a onfiguration file to `/etc/network/interfaces.d/YOUR-CONF` but I'd like to use the basic config file `/etc/network/interfaces`. Here a template for the Rasberry Pi Router. Fot the Debian installed on the notebook you can modify this here. To get your informations about interfaces on your device use `ifconfig` or `ip`. And for more information about interfaces I like to refer to [ubuntuusers](https://wiki.ubuntuusers.de/interfaces/).
 
 ```bash
 source /etc/network/interfaces.d/*
@@ -97,7 +154,10 @@ So to check if everything runs fine you can check that with followed commands.
 ```bash
 #!/bin/bash
 ifconfig # or 'ip -br a'
+sudo systemctl status networking
 ```
+
+# Raspberry Pi (Rasberry Pi OS)
 
 ## PiHole
 
@@ -389,10 +449,7 @@ If you want to get access from outside you have probably a dynamic ip adress tha
 Here I show how it's done with the service `ddclient` and **no-ip.com** since **no-ip.com** is free to use. `ddclient` can use every host of DDNS adresses.
 
 ```bash
-#!/bin/bash
-sudo apt-get install ddclient
-sudo nano /etc/ddclient.conf
-```
+#!/bin/bashYou should see the configured 
 
 Here the configuration for **no-ip.com** with `ddclient`.
 
@@ -414,20 +471,20 @@ sudo systemctl status ddclient
 
 If `ddclient` has a error within it's status restart the service and try it again.
 
+# Notebook (Debian)
+
 ## Jellyfin
 
-Also i like to run a Jellyfin server. And if you use the raspberry only for transfering the data it's no big deal because the encoding process will happen on the client devices.
-
-Here the oneshot line to install Jellyfin.
+You could use Jellyfin on your Raspberry Pi (I did that) but for me it's response time is too long so I swapped to my notebook for that. Here the oneshot line to install Jellyfin. Works for Raspberry Pi OS and Debian.
 
 ```bash
 #!/bin/bash
 curl -s https://repo.jellyfin.org/install-debuntu.sh | sudo bash
 ```
 
-For the storage I use a hard drive that is mounted through the configuration that I made within `/etc/fstab`.
+### Storage
 
-Output every UUID and storage information of connected devices.
+For the storage I use a hard drive that is mounted through the configuration that I made within `/etc/fstab`. Output every UUID and storage information of connected devices.
 
 ```bash
 #!/bin/bash
@@ -444,9 +501,80 @@ Add this line with your mounting directory and the UUID of your device to the fi
 UUID=YOUR_UUID /MOUNTINGDIR ext4 defaults,users,exec 0 0
 ```
 
-After a reboot the device should be mounted. You can check that using `df`. If everything is fine you can refer within jellyfin to the directories of the device and storage your data on this device.
+After a reboot the device should be mounted. You can check that using `df`. Now we have to give access to the `jellyfin` user so that Jellyfin has access to the files on this device.
 
-### HTTPS
+```bash
+#!/bin/bash
+sudo chown -R jellyfin: /MOUNTINGDIR
+sudo chmod -R 755 /MOUNTINGDIR
+```
+
+### Hardware Acceleration - Intel GPU
+
+To setup hardware acceleration for transcoding or other processes with an Intel GPU. Also I want to refer to the (guide)[https://jellyfin.org/docs/general/post-install/transcoding/hardware-acceleration/intel] by the Jellyfin team.
+
+Installation of resources (drivers) for Jellyfin.
+
+```bash
+#!/bin/bash
+sudo apt install jellyfin-ffmpeg7 intel-opencl-icd
+```
+
+Now assign the `render` group to `jellyfin` and restart the notebook the be sure that everything (like drivers) are loaded correctly. For checkout if the drivers are loaded correctly you can use the commands used in the [offical tutorial](https://jellyfin.org/docs/general/post-install/transcoding/hardware-acceleration/intel)
+
+```bash
+#!/bin/bash
+sudo usermod -aG render jellyfin
+sudo reboot
+```
+
+To get access to Jellyfin you can use the web browser using `http://HOSTNAME:8096` or a client software. There you can setup your folders that are located on your external storage. Also to get *Hardware Acceleration* working you have to go to `Dashboard -> Playback -> Transcoding` and choose in `Hardware acceleration` `Video Acceleration API (VAAPI)`.
+
+## Samba
+
+Here will be explained how to install Samba to get access to the choosen folders remotely. This part is fully compatible with `Rasberry Pi OS`.
+
+```bash
+#!/bin/bash
+sudo apt install samba samba-common
+cd /etc/samba; sudo cp -a smb.conf smb.conf.backup
+```
+
+Now edit the Samba configuration (`/etc/samba/smb.conf`) to get remote access to the choosen folder via a certain user. You can add an additional user for that using `sudo adduser USERNAME`. Here an example.
+
+```bash
+... # leave unchanged
+
+[global]
+workgroup = WORKGROUP
+security = user
+encrypt passwords = yes
+client min protocol = SMB2
+client max protocol = SMB3
+
+... # leave unchanged 
+
+# add lines for remote access to the end
+[USERNAME]
+path = /mnt/REMOTEACCESS
+valid users = USERNAME
+writeable = yes
+browseable = yes
+public = no
+```
+
+Now that everything is setup check the service and enable it if everything runs fine.
+
+```bash
+#!/bin/bash
+# reload service
+sudo systemctl restart smbd.service nmbd.service
+
+# enable service
+sudo systemctl enable smbd.service nmbd.service
+```
+
+# HTTPS
 
 It is important to know that every client software that I know can't handle self signed SSL certificates. Other users have the same problem here. So I would say if you want to use HTTPS you have no choice but to make a certified SSL certificate. For that you can use `certbot`. 
 
