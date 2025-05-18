@@ -24,6 +24,12 @@
         - [Hardware Acceleration - Intel GPU](#hardware-acceleration---intel-gpu)
     - [Samba](#samba)
 - [HTTPS](#https)
+    - [Self Signed SSL](#self-signed-ssl)
+    - [Reverse Proxy](#reverse-proxy)
+        - [Apache2](#apache2_reverseProxy)
+- [Firewall](#firewall)
+    - [Hints for NAT via `ufw`](#hints-for-nat-via-ufw)
+    - [Setup](#setup_ufw)
 
 <a name="os"></a>
 # Choice of OS
@@ -606,8 +612,154 @@ sudo systemctl enable smbd.service nmbd.service
 
 # HTTPS
 
-It is important to know that every client software that I know can't handle self signed SSL certificates. Other users have the same problem here. So I would say if you want to use HTTPS you have no choice but to make a certified SSL certificate. For that you can use `certbot`. 
+It is important to know that every client software that I know can't handle self signed SSL certificates. Other users have the same problem here. As example the Jellyfin and Suwayomi client software has no possibility to connect via HTTPS if the SSL certificat is self signed. So I would say if you want to use HTTPS you have no choice but to make a certified SSL certificate. For that you can use `certbot`. But a downside by using `certbot` is that the SSL certs expire pretty fast and have to be newly generated because if not we have the same problem as with the self signed ones. The client software doesn't connect via HTTPS. **But** if the wished service (like Suwayomi) is only used via the web browser that problem is no more. For that I use `openssl` to generate a self signed SSL cert.
 
-Or you make a reverse proxy. The scenario is that Jellyfin uses a self signed SSL certificate and your desktop binds that connection locally over HTTP using Apache2 or something like that. 
+I you want to setup HTTPS for a working HTTP website you can either add the generated SSL certificate or if not possible through a *reverse proxy*.
 
-But that would only workout for devices that can bind the HTTPS connection locally on a local HTTP side. So mobile devices would have trouble with that.
+## Self Signed SSL
+
+Generate a self signed SSL certificate using `openssl` that expire after one year. The duration until the certificate will expire can be changed.
+
+```bash
+#!/bin/bash
+sudo apt install openssl
+# generate ssl cert
+openssl req -x509 -newkey rsa:4096 -keyout ssl-selfsigned.key -out ssl-selfsigned.crt -days 365 -nodes
+```
+
+The `-x509` stands for a self signed cert. `rsa:4096` sets the encryption method to RSA 4096 Bit. Change `-days DURATION` to a wished duration how long the cert should be valid. `-nodes` declares that no password based encryption should be used for the private key. Pretty useful so you don't have to enter the password for starting Apache2 as a service.
+
+## Reverse Proxy
+
+The scenario is that you have a web service that doesn't support HTTPS directly. Here you use a self signed SSL certificate and Nginx or Apache2. Now setup one of them to pass the HTTPS requests locally to the HTTP service and that's it. Basicly we tunnel locally the original HTTP web service to another web service that uses HTTPS. Additionally you can forbit the HTTP port to be used by external clients directly so the only way is through the HTTPS web service that tunnels the request to the original one. For that you can use `ufw` or maybe something like that is already possible by the HTTP service itself.
+
+<a name="apache2_reverseProxy"></a>
+### Apache2
+
+Here how to setup Apache2 to setup as reverse proxy.
+
+```bash
+#!/bin/bash
+# setup basic apache
+sudo apt install apache2
+sudo systemctl enable apache2
+# enable needed modules
+sudo a2enmod ssl rewrite proxy proxy_http
+```
+
+Now we add up a site under Apache2 and enable that site. After that it's needed to reload/restart Apache2 to load the enabled modules and it's site.
+
+```bash
+#!/bin/bash
+cd /etc/apache2/sites-available
+sudo nano reverseProxy.conf
+```
+
+Here an example how the configuration file can look like and works out for me. The adress `http://127.0.0.1:8149` using the port **8149** is the original web page and the tunneled web page through HTTPS is located under the port **8150**. 
+
+```bash
+<VirtualHost *:8150>
+    SSLEngine on
+    SSLCertificateFile /PATH/ssl-selfsigned.crt
+    SSLCertificateKeyFile /PATH/ssl-selfsigned.key
+
+    ProxyPreserveHost On
+    ProxyPass / http://127.0.0.1:8149/
+    ProxyPassReverse / http://127.0.0.1:8149/
+</VirtualHost>
+```
+
+The declared port **4590** for Apache2 has to be mapped within the `/etc/apache2/ports.conf`. Here an example like I did that.
+
+```bash
+#!/bin/bash
+cd /etc/apache2
+sudo cp ports.conf ports.conf.backup
+sudo nano ports.conf 
+```
+
+And here the `/etc/apache2/ports.conf`.
+
+```bash
+# If you just change the port or add more ports here, you will likely also
+# have to change the VirtualHost statement in
+# /etc/apache2/sites-enabled/000-default.conf
+
+Listen 80
+
+<IfModule ssl_module>
+        Listen 443
+        Listen 8150 # reverse proxy
+</IfModule>
+
+<IfModule mod_gnutls.c>
+        Listen 443
+        Listen 8150 # reverse proxy
+</IfModule>
+
+```
+
+Now enable the site and restart/reload the Apache2 service. And maybe checkout the **status** of Apache2 if something doesn't work like it should.
+
+```bash
+#!/bin/bash
+sudo a2ensite reverseProxy
+sudo systemctl restart apache2
+sudo systemctl status apache2
+```
+
+The website should be reachable via the url `https://IP-ADRESS:8150`.
+
+# Firewall
+
+For a firewall setup I use `ufw`. `ufw` will replace `netfilter-persistent` so I would recommend to use `ufw` only for the servers that doesn't use *NAT* (*Network Adress Translation*). This package is a firewall (filters packages) that wraps around `iptables` so basicly you *can* use NAT but you have to put the configuration for `iptables` that should load up by `netfilter-persistent` into the configuration file of `ufw`. 
+
+## Hints for NAT via `ufw`
+
+Put the parts that you want to load up (iptables config `/etc/iptables/rules.v4`) into the file `/etc/ufw/before.rules`. So the configuration will load up as before.
+
+<a name="setup_ufw"></a>
+## Setup
+
+Here a basic setup for `ufw` so every request from outside that is not allowed spezifically will be blocked.
+
+```bash
+#!/bin/bash
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+```
+
+Now allow SSH before load up the firewall. If loaded before SSH is allowed the connection will break and you will lose potentially your server access.
+
+```bash
+#!/bin/bash
+sudo ufw allow 22/tcp # or simply *allow ssh* if port is default
+sudo ufw enable
+```
+
+Last but not least adding every service (port) that should be reachable from outside.
+
+```bash
+#!/bin/bash
+# own dns setup
+sudo ufw allow 53 
+sudo ufw allow 5335
+# dhcp, hostapd, samba & jellyfin
+sudo ufw allow 67/udp
+sudo ufw allow 68/udp
+sudo ufw allow Samba
+sudo ufw allow 8096/tcp
+sudo ufw allow 8920/tcp
+# reverse proxy & web services
+sudo ufw allow 80/tcp
+sudo ufw allow 445/tcp
+sudo ufw allow 8150/tcp
+```
+
+And reload `ufw` to get the changes working and checkout the status of `ufw`.
+
+```bash
+#!/bin/bash
+sudo ufw reload
+sudo ufw status
+```
