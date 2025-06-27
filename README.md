@@ -133,7 +133,7 @@ sudo apt-get install ifupdown
 sudo rfkill unblock wifi # remove soft lock of wlan interface
 ```
 
-For the configuration of this service you can add a onfiguration file to `/etc/network/interfaces.d/YOUR-CONF` but I'd like to use the basic config file `/etc/network/interfaces`. Here a template for the Rasberry Pi Router. Fot the Debian installed on the notebook you can modify this here. To get your informations about interfaces on your device use `ifconfig` or `ip`. And for more information about interfaces I like to refer to [ubuntuusers](https://wiki.ubuntuusers.de/interfaces/).
+For the configuration of this service you can add a configuration file to `/etc/network/interfaces.d/YOUR-CONF` but I'd like to use the basic config file `/etc/network/interfaces`. Here a template for the Rasberry Pi Router. For the Debian installed on the notebook you can modify this here. To get your informations about interfaces on your device use `ifconfig` or `ip`. And for more information about interfaces I like to refer to [ubuntuusers](https://wiki.ubuntuusers.de/interfaces/).
 
 ```bash
 source /etc/network/interfaces.d/*
